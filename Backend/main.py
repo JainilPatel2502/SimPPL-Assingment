@@ -1,9 +1,12 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import pandas as pd
+import numpy as np
 import os
 import networkx as nx
 from datetime import date
+from sklearn.cluster import KMeans
 import uvicorn
 from contextlib import asynccontextmanager
 
@@ -128,6 +131,43 @@ def get_network(
         pass
         
     return {"nodes": nodes, "links": links}
+
+@app.get("/api/topic/clusters")
+def get_clusters(
+    n_clusters: int = Query(5, description="Number of clusters to generate via KMeans", ge=2, le=20),
+    limit: int = Query(2000, description="Max points to return for 3D rendering")
+):
+    """Returns 3D coordinates for posts, clustered dynamically via KMeans."""
+    if df is None or len(df) == 0:
+        return []
+    working_df = df.copy()
+
+    # Drop null coordinates
+    if 'umap_x' not in working_df.columns or 'umap_y' not in working_df.columns:
+        return []
+        
+    valid_df = working_df.dropna(subset=['umap_x', 'umap_y', 'umap_z'])
+    if len(valid_df) == 0:
+        return []
+
+    # Cap size for WebGL performance
+    if len(valid_df) > limit:
+        valid_df = valid_df.sample(n=limit, random_state=42).copy()
+
+    # Run Lightning-Fast KMeans on the 3D coords
+    coords = valid_df[['umap_x', 'umap_y', 'umap_z']].values
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto')
+    valid_df['cluster'] = kmeans.fit_predict(coords)
+
+    # Select columns to send to frontend
+    cols_to_keep = ['author', 'subreddit', 'title', 'umap_x', 'umap_y', 'umap_z', 'cluster', 'score']
+    cols_to_keep = [c for c in cols_to_keep if c in valid_df.columns]
+
+    result_df = valid_df[cols_to_keep].fillna('')
+    if 'score' in result_df.columns:
+        result_df['score'] = pd.to_numeric(result_df['score'], errors='coerce').fillna(0)
+
+    return result_df.to_dict(orient='records')
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
