@@ -9,6 +9,7 @@ from datetime import date
 from sklearn.cluster import KMeans
 import uvicorn
 from contextlib import asynccontextmanager
+from nlp_analysis import extract_post_insights
 
 app = FastAPI(title="Investigative Social Media Analysis Dashboard")
 
@@ -168,6 +169,37 @@ def get_clusters(
         result_df['score'] = pd.to_numeric(result_df['score'], errors='coerce').fillna(0)
 
     return result_df.to_dict(orient='records')
+
+@app.get("/api/topic/search")
+def search_posts(
+    q: str = Query(None, description="Search query string"),
+    subreddit: str = Query(None, description="Subreddit to search in"),
+    author: str = Query(None, description="Author to search for"),
+    start_date: date = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: date = Query(None, description="End date (YYYY-MM-DD)"),
+    page: int = Query(1, description="Page number", ge=1),
+    limit: int = Query(10, description="Results per page", ge=1, le=100)
+):
+    """Basic keyword search endpoint."""
+    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date)
+    
+    if len(filtered_df) == 0:
+        return {"total_matches": 0, "results": []}
+        
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    paginated_df = filtered_df.iloc[start_idx:end_idx]
+    
+    results = paginated_df.to_dict(orient='records')
+    # Run simple NLP insights locally on the loaded page
+    cleaned_results = []
+    for r in results:
+        r_clean = {k: ('' if pd.isna(v) else v) for k, v in r.items()}
+        insights = extract_post_insights(str(r_clean.get('title', '')) + " " + str(r_clean.get('content', '')))
+        r_clean['nlp_insights'] = insights
+        cleaned_results.append(r_clean)
+        
+    return {"total_matches": len(filtered_df), "results": cleaned_results}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
