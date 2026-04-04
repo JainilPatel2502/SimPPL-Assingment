@@ -7,7 +7,12 @@ from langchain_core.tools import tool
 SYSTEM_PROMPT = """You are a data analyst assistant for a Reddit dataset about a high-profile legal investigation.
 You have access to a pandas DataFrame `df`. When the user asks a data question, you MUST call the `query_dataset` tool with valid Python code.
 CRITICAL: `query_dataset` is the ONLY tool that exists. There are NO other tools.
-CRITICAL: You MUST assign your final output to a variable named exactly `result` (e.g. `result = df.head()`). Do NOT omit `result = `.
+You can execute multi-line python code! The tool execution environment will automatically retrieve the value of the last variable you assign.
+Example: 
+top_users = df[df['author'].str.contains('auto', case=False)]['author'].value_counts()
+total = df.shape[0]
+result = {'top': top_users.to_dict(), 'total': total}
+
 Use only `df`, `pd`, `np` — no other imports.
 Study the "Dataset schema" provided at the end of this prompt carefully. It contains the exact column names, data types, and sample rows from the dataset. ONLY use the columns listed there.
 Always be concise, explain results in nicely formatted Markdown, and provide the exact answer to the user's question.
@@ -27,9 +32,12 @@ def process_chat_message(
 
     @tool
     def query_dataset(code: str) -> str:
-        """Call this tool to execute Python/pandas code against the Reddit DataFrame `df`. 
-        CRITICAL: The string you provide MUST explicitly contain 'result = ' followed by your pandas query. 
-        Example: `result = df['subreddit'].value_counts()`. Do NOT omit `result = `.
+        """Call this tool to execute multi-line Python/pandas code against the Reddit DataFrame `df`. 
+        You can assign multiple variables across different lines. The tool will automatically return the value of the last assigned variable.
+        Example: 
+        top = df['subreddit'].value_counts()
+        total = len(df)
+        result = (top, total)
         Globals available: df, pd, np, semantic_search."""
         return query_callback(code)
 
@@ -54,25 +62,28 @@ def process_chat_message(
     try:
         print("[DEBUG chatbot.py] Invoking OpenAI tool LLM...")
         response = llm_with_tools.invoke(msgs)
-        
+
         print(f"[DEBUG chatbot.py] Response tool calls: {response.tool_calls}")
 
         if response.tool_calls:
-            tool_call = response.tool_calls[0]
-            generated_code = tool_call["args"].get("code", "")
-            print(f"[DEBUG chatbot.py] Raw generated code arg: {generated_code}")
+            # Add the model's tool calls output to the message history so it knows what it asked
+            msgs.append(response)
             
-            raw_result = query_callback(generated_code)
-            print(f"[DEBUG chatbot.py] raw_result from execution: {raw_result}")
+            # OpenAI requires a ToolMessage response for EVERY tool_call_id generated
+            for tool_call in response.tool_calls:
+                generated_code = tool_call["args"].get("code", "")
+                print(f"[DEBUG chatbot.py] Raw generated code arg: {generated_code}")
 
-            msgs.extend([
-                response,
-                ToolMessage(content=str(raw_result), tool_call_id=tool_call["id"], name=tool_call["name"])
-            ])
-            
+                raw_result = query_callback(generated_code)
+                print(f"[DEBUG chatbot.py] raw_result from execution: {raw_result}")
+
+                msgs.append(
+                    ToolMessage(content=str(raw_result), tool_call_id=tool_call["id"], name=tool_call["name"])
+                )
+
             answer = llm_with_tools.invoke(msgs).content
             print(f"[DEBUG chatbot.py] Final LLM Answer: {answer}")
-            
+
         elif hasattr(response, "invalid_tool_calls") and response.invalid_tool_calls:
             print(f"[DEBUG chatbot.py] Invalid tool calls generated: {response.invalid_tool_calls}")
             answer = llm.invoke(msgs).content  # Retry without tools

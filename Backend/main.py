@@ -680,20 +680,31 @@ def _run_query(code: str) -> str:
         
     if df is None:
         return "Error: Dataset not loaded."
+        
     namespace = {"df": df, "pd": pd, "np": np, "semantic_search": semantic_search_impl, "result": None}
+    initial_keys = set(namespace.keys())
+    
     try:
         exec(code, namespace)  # noqa: S102
         result = namespace.get("result")
         print(f"[DEBUG main.py] Result after exec: {type(result)}")
+        
         if result is None:
-            # Fallback: maybe they just passed an expression
-            try:
-                result = eval(code, namespace)
-                print("[DEBUG main.py] Evaluated as expression successfully.")
-            except Exception as e:
-                err_msg = f"Error: Code ran but `result` was not assigned and code was not a valid expression. Eval error: {e}"
-                print(f"[DEBUG main.py] {err_msg}")
-                return err_msg
+            # Determine newly created variables
+            new_keys = [k for k in namespace.keys() if k not in initial_keys and not k.startswith('_')]
+            if new_keys:
+                last_key = new_keys[-1]
+                result = namespace[last_key]
+                print(f"[DEBUG main.py] Automatically grabbed result from newly assigned variable '{last_key}'.")
+            else:
+                # Fallback: maybe they just passed an expression directly without assigning
+                try:
+                    result = eval(code, namespace)
+                    print("[DEBUG main.py] Evaluated as expression successfully.")
+                except Exception as e:
+                    err_msg = f"Error: Code ran but `result` was not assigned and code was not a valid expression. Eval error: {e}"
+                    print(f"[DEBUG main.py] {err_msg}")
+                    return err_msg
         
         # Process result for JSON serialization
         if hasattr(result, "tolist"):  # Convert numpy arrays (like from .unique()) to lists
