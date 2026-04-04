@@ -2,14 +2,22 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import pandas as pd
+from pydantic import BaseModel
 import numpy as np
 import os
+import traceback
 import networkx as nx
 from datetime import date
 from sklearn.cluster import KMeans
 import uvicorn
+from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from nlp_analysis import extract_post_insights
+from chatbot import process_chat_message
+from genai_insights import generate_timeline_summary
+
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 app = FastAPI(title="Investigative Social Media Analysis Dashboard")
 
@@ -40,6 +48,7 @@ def _filter_dataframe(query=None, subreddit=None, author=None, start_date=None, 
 @app.on_event("startup")
 async def startup_event():
     global df
+    global schema_context
     print("Loading initial dataset...")
     try:
         if os.path.exists(DATA_PATH):
@@ -50,6 +59,19 @@ async def startup_event():
             # Extract just the date for timeline aggregation
             df['date'] = df['datetime'].dt.date
             print(f"Dataset loaded: {len(df)} rows")
+            
+            # Build schema context for the AI
+            col_info = []
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    unique_vals = df[col].dropna().unique()
+                    if len(unique_vals) < 10:
+                        col_info.append(f"- {col} (categorical): e.g., {', '.join(map(str, unique_vals[:5]))}")
+                    else:
+                        col_info.append(f"- {col} (text)")
+                else:
+                    col_info.append(f"- {col} (numeric): min={df[col].min()}, max={df[col].max()}")
+            schema_context = "\n".join(col_info)
     except Exception as e:
         print(f"Error loading dataset: {e}")
 
@@ -200,6 +222,24 @@ def search_posts(
         cleaned_results.append(r_clean)
         
     return {"total_matches": len(filtered_df), "results": cleaned_results}
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[dict]
+
+class ChatResponse(BaseModel):
+    response: str
+    error: str = None
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest):
+    return process_chat_message(
+        message=req.message,
+        history=req.history,
+        api_key=OPENAI_API_KEY,
+        schema_context=schema_context,
+        query_callback=None
+    )
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
