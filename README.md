@@ -35,18 +35,51 @@ This project serves as a case study on the release of the **"Epstein Files"**, a
 ---
 
 ## Screenshots
+## 📸 Screenshots
 
-_(Ensure you replace these placeholder image links with actual screenshots of your running dashboard!)_
+### 🔹 Interactive Timeline & Trend Analysis
+![Interactive Timeline](https://github.com/user-attachments/assets/35e640b1-79ad-4744-8726-d640b108417c)
 
-![Dashboard Overview](<img width="2559" height="1599" alt="image" src="https://github.com/user-attachments/assets/91dba6d7-4a69-4111-ad00-6233fbdcbcb8" />
-)
+Explore how discussions evolve over time with an interactive timeline.  
+Includes dynamic GenAI-generated summaries, highlighting top subreddits and key actors driving conversations.
 
+---
 
-![Network Centrality Graph](https://via.placeholder.com/800x400.png?text=Network+Graph)
-_Network visualization highlighting community detection and key influencers._
+### 🔹 AI Chatbot for Data Exploration
+![AI Chatbot](https://github.com/user-attachments/assets/78f948dd-07ff-4b4d-9df3-7c58aeabfc00)
 
-![Topic Clustering Map](https://via.placeholder.com/800x400.png?text=Topic+Clustering+Map)
-_High-dimensional embeddings mapped into tunable thematic clusters._
+A natural language interface that allows users to query the dataset effortlessly.  
+<br>
+
+**Prompt:** `find me top 5 useres with "Auto" in name be case insensitive and find what percent of the post did the user with auto posted within these two months give me tables and percentage post.`
+
+---
+
+### 🔹 LLM Query Transparency
+![LLM Queries](https://github.com/user-attachments/assets/bf3c31a9-844b-4f82-9aea-91a16e6c203e)
+
+Inspect the exact Pandas queries generated and executed by the LLM. Enhances trust and debuggability by showing how answers are derived.
+
+---
+
+### 🔹 Automated NLP Analysis
+![NLP Analysis](https://github.com/user-attachments/assets/42412fdd-e10f-4de0-a97d-c59c55a6da8b)
+
+Performs sentiment analysis, entity extraction, and narrative detection on posts. Helps uncover underlying themes and emotional trends in discussions.
+
+---
+
+### 🔹 Semantic Embedding Clusters
+![Embedding Clusters](https://github.com/user-attachments/assets/78519521-6fc1-43ae-bc31-12947ba862bb)
+
+Visualizes high-dimensional embeddings projected into interpretable clusters. Allows dynamic exploration of thematic groupings within the dataset.
+
+---
+
+### 🔹 Network Graph & Community Detection
+![Network Graph](https://github.com/user-attachments/assets/d0b1f0e0-c2c1-41bb-9197-f42892cef6ac)
+
+Interactive graph showcasing relationships between users and communities. Highlights influencer nodes, bot clusters, and structural patterns in the network.
 
 ---
 
