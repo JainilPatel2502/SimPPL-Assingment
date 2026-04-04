@@ -1,121 +1,641 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  fetchTimeline,
+  fetchTimelineSummary,
+  fetchSubreddits,
+  fetchDomains,
+  fetchAuthors,
+  fetchNetwork,
+  fetchSearch,
+  fetchClusters,
+} from "./lib/api";
+import {
+  Search,
+  Users,
+  Globe,
+  LayoutDashboard,
+  Calendar,
+  RefreshCw,
+  ArrowLeft,
+  MessageSquare,
+  X,
+  PanelRightOpen,
+  PanelRightClose,
+} from "lucide-react";
+import TimelineChart from "./components/TimelineChart";
+import BarChart from "./components/BarChart";
+import RankedTable from "./components/RankedTable";
+import NetworkGraph from "./components/NetworkGraph";
+import TopicClusters from "./components/TopicClusters";
+import PostList from "./components/PostList";
+import ChatPanel from "./components/ChatPanel";
 
-function App() {
-  const [count, setCount] = useState(0)
+const CARD =
+  "rounded-xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-2xl";
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function useSessionState(key, initialValue) {
+  const [value, setValue] = useState(() => {
+    try {
+      const item = window.sessionStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+  useEffect(
+    () => window.sessionStorage.setItem(key, JSON.stringify(value)),
+    [key, value],
+  );
+  return [value, setValue];
 }
 
-export default App
+function App() {
+  const [query, setQuery] = useSessionState("trace_query", "");
+  const [subredditQuery, setSubredditQuery] = useSessionState("trace_sub", "");
+  const [authorQuery, setAuthorQuery] = useSessionState("trace_auth", "");
+  const [searchInput, setSearchInput] = useSessionState(
+    "trace_input",
+    "epstein",
+  );
+
+  const [startDate, setStartDate] = useSessionState("trace_start", null);
+  const [endDate, setEndDate] = useSessionState("trace_end", null);
+  const [mode, setMode] = useSessionState("trace_mode", "topic");
+
+  const [timelineData, setTimelineData] = useState([]);
+  const [subreddits, setSubreddits] = useState([]);
+  const [domains, setDomains] = useState([]);
+  const [authors, setAuthors] = useState([]);
+  const [networkData, setNetworkData] = useState({ nodes: [], links: [] });
+  const [clusterData, setClusterData] = useState([]);
+  const [timelineSummary, setTimelineSummary] = useState("");
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [nClusters, setNClusters] = useState(5);
+  const [evidencePosts, setEvidencePosts] = useState([]);
+  const [totalMatches, setTotalMatches] = useState(0);
+  const [postSortBy, setPostSortBy] = useState("score");
+  const [postOffset, setPostOffset] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  const navigate = useNavigate();
+
+  const currentQuery = mode === "topic" ? query || null : null;
+  const currentSubreddit = mode === "subreddit" ? subredditQuery || null : null;
+  const currentAuthor = mode === "user" ? authorQuery || null : null;
+
+  const loadData = async (isIncremental = false) => {
+    if (!currentQuery && !currentSubreddit && !currentAuthor) {
+      setTimelineData([]);
+      setSubreddits([]);
+      setDomains([]);
+      setAuthors([]);
+      setNetworkData({ nodes: [], links: [] });
+      setEvidencePosts([]);
+      setTotalMatches(0);
+      return;
+    }
+    setLoading(true);
+    try {
+      if (!isIncremental) {
+        const [timeline, subs, doms, auth, net, clusters, evidence] =
+          await Promise.all([
+            fetchTimeline(
+              currentQuery,
+              currentSubreddit,
+              currentAuthor,
+              startDate,
+              endDate,
+            ),
+            fetchSubreddits(
+              currentQuery,
+              currentSubreddit,
+              currentAuthor,
+              startDate,
+              endDate,
+              15,
+            ),
+            fetchDomains(
+              currentQuery,
+              currentSubreddit,
+              currentAuthor,
+              startDate,
+              endDate,
+              15,
+            ),
+            fetchAuthors(
+              currentQuery,
+              currentSubreddit,
+              currentAuthor,
+              startDate,
+              endDate,
+              15,
+            ),
+            fetchNetwork(
+              currentQuery,
+              currentSubreddit,
+              currentAuthor,
+              startDate,
+              endDate,
+              60,
+            ),
+            fetchClusters(nClusters, 2000),
+            fetchSearch(
+              currentQuery,
+              currentSubreddit,
+              currentAuthor,
+              startDate,
+              endDate,
+              10,
+              postSortBy,
+              "desc",
+              0,
+            ),
+          ]);
+        setTimelineData(timeline);
+        setSubreddits(subs);
+        setDomains(doms);
+        setAuthors(auth);
+        setNetworkData(net);
+        setClusterData(clusters || []);
+        setEvidencePosts(evidence.results);
+        setTotalMatches(evidence.total_matches);
+
+        // Fetch AI Summary asynchronously
+        setLoadingSummary(true);
+        fetchTimelineSummary(
+          currentQuery,
+          currentSubreddit,
+          currentAuthor,
+          startDate,
+          endDate,
+        )
+          .then((summaryRes) => {
+            setTimelineSummary(summaryRes.summary);
+            setLoadingSummary(false);
+          })
+          .catch((err) => {
+            console.error("AI Summary error", err);
+            setTimelineSummary("AI Summary failed to load.");
+            setLoadingSummary(false);
+          });
+      } else {
+        const evidence = await fetchSearch(
+          currentQuery,
+          currentSubreddit,
+          currentAuthor,
+          startDate,
+          endDate,
+          10,
+          postSortBy,
+          "desc",
+          postOffset,
+        );
+        setEvidencePosts((prev) => [...prev, ...evidence.results]);
+        setTotalMatches(evidence.total_matches);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setPostOffset(0);
+    loadData(false);
+  }, [
+    query,
+    subredditQuery,
+    authorQuery,
+    startDate,
+    endDate,
+    mode,
+    postSortBy,
+    nClusters,
+  ]);
+  useEffect(() => {
+    if (postOffset > 0) loadData(true);
+  }, [postOffset]);
+
+  const handleLoadMore = () => setPostOffset((prev) => prev + 10);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (mode === "subreddit") {
+      setSubredditQuery(searchInput);
+      setQuery("");
+      setAuthorQuery("");
+    } else if (mode === "user") {
+      setAuthorQuery(searchInput);
+      setQuery("");
+      setSubredditQuery("");
+    } else {
+      setQuery(searchInput);
+      setSubredditQuery("");
+      setAuthorQuery("");
+    }
+  };
+
+  const handleDateChange = (start, end) => {
+    setStartDate(start);
+    setEndDate(end);
+  };
+
+  const handleSubredditClick = (name) => {
+    setMode("subreddit");
+    setSearchInput(name);
+    setSubredditQuery(name);
+    setQuery("");
+    setAuthorQuery("");
+  };
+  const handleAuthorClick = (name) => {
+    setMode("user");
+    setSearchInput(name);
+    setAuthorQuery(name);
+    setQuery("");
+    setSubredditQuery("");
+  };
+
+  const switchMode = (m) => {
+    setMode(m);
+    if (m === "topic") setSearchInput(query || "epstein");
+    if (m === "subreddit") setSearchInput(subredditQuery || "conspiracy");
+    if (m === "user") setSearchInput(authorQuery || "");
+  };
+
+  const modeLabels = {
+    topic: {
+      header: "Narrative Intelligence",
+      hint: "Tracking Epstein discourse across Reddit",
+    },
+    subreddit: {
+      header: `r/${subredditQuery || "…"}`,
+      hint: "Community deep dive",
+    },
+    user: { header: `u/${authorQuery || "…"}`, hint: "Actor profile" },
+  };
+  const lbl = modeLabels[mode];
+
+  const navItems = [
+    { key: "topic", Icon: LayoutDashboard, label: "Topic Analysis" },
+    { key: "subreddit", Icon: Globe, label: "Subreddit Mode" },
+    { key: "user", Icon: Users, label: "Actor Mode" },
+  ];
+
+  return (
+    <div
+      className="flex h-screen bg-black text-white overflow-hidden"
+      style={{ fontFamily: "'Inter', sans-serif" }}
+    >
+      {/* ── Background orbs ── */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div
+          className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(88,28,235,0.10) 0%, transparent 70%)",
+          }}
+        />
+        <div
+          className="absolute -bottom-60 -right-40 w-[700px] h-[700px] rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(124,58,237,0.07) 0%, transparent 70%)",
+          }}
+        />
+      </div>
+
+      {/* ── LEFT SIDEBAR ── */}
+      <div className="relative z-10 w-56 shrink-0 flex flex-col border-r border-white/[0.06] bg-white/[0.02] backdrop-blur-2xl">
+        <div className="px-5 pt-7 pb-5">
+          <h1 className="text-[15px] font-semibold tracking-[0.15em] text-white uppercase">
+            TRACE
+          </h1>
+          <p className="text-[10px] tracking-widest text-white/25 mt-0.5 uppercase">
+            Narrative Intelligence
+          </p>
+        </div>
+        <div className="h-px bg-white/[0.06] mx-5" />
+        <nav className="flex-1 py-5 px-3 flex flex-col gap-0.5">
+          {navItems.map(({ key, Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => switchMode(key)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 text-left w-full ${
+                mode === key
+                  ? "bg-white/[0.07] text-white border-l-2 border-violet-400 rounded-l-none"
+                  : "text-white/40 hover:text-white/70 hover:bg-white/[0.04]"
+              }`}
+            >
+              <Icon
+                size={15}
+                className={mode === key ? "text-violet-400" : "text-white/30"}
+              />
+              {label}
+            </button>
+          ))}
+        </nav>
+        {(mode === "subreddit" || mode === "user") && (
+          <button
+            onClick={() => switchMode("topic")}
+            className="mx-3 mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-all border border-white/[0.05]"
+          >
+            <ArrowLeft size={12} /> Back to Topic
+          </button>
+        )}
+        <div className="px-5 py-4 border-t border-white/[0.06]">
+          <p className="text-[10px] text-white/20 tracking-wider">
+            2026 · Epstein Case
+          </p>
+        </div>
+      </div>
+
+      {/* ── MAIN CONTENT ── */}
+      <div className="flex-1 flex flex-col overflow-hidden relative z-10 min-w-0">
+        {/* Header */}
+        <header className="h-[60px] border-b border-white/[0.06] flex items-center justify-between px-6 bg-black/70 backdrop-blur-2xl shrink-0">
+          <div className="flex items-center gap-5">
+            <div>
+              <p className="text-[13px] font-semibold text-white leading-none">
+                {lbl.header}
+              </p>
+              <p className="text-[10px] text-white/30 mt-0.5">{lbl.hint}</p>
+            </div>
+            <div className="h-4 w-px bg-white/[0.08]" />
+            <form
+              onSubmit={handleSearch}
+              className="relative flex items-center gap-2"
+            >
+              <div className="relative flex-1">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                  size={15}
+                />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search narratives, communities, or keywords…"
+                  className="bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.15] rounded-xl py-2.5 pl-10 pr-4 text-[14px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-violet-500/60 focus:bg-white/[0.06] transition-all w-[500px]"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-violet-600 hover:bg-violet-500 text-white font-medium text-[13px] px-5 py-2.5 rounded-xl transition-colors border border-violet-500 hover:border-violet-400 shrink-0"
+              >
+                Search
+              </button>
+            </form>
+          </div>
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex items-center gap-1.5 text-[11px] ${loading ? "text-white/40" : "text-white/30"}`}
+            >
+              {loading ? (
+                <>
+                  <RefreshCw size={11} className="animate-spin" />
+                  <span>Loading</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
+                </>
+              )}
+            </div>
+            <div className="h-4 w-px bg-white/[0.08]" />
+            <button
+              onClick={() => setChatOpen((o) => !o)}
+              title="Toggle AI Chat"
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all border ${
+                chatOpen
+                  ? "bg-violet-500/10 border-violet-400/30 text-violet-300"
+                  : "bg-white/[0.04] border-white/[0.07] text-white/35 hover:text-white/60 hover:bg-white/[0.07]"
+              }`}
+            >
+              <MessageSquare size={13} />
+              <span>Dataset AI</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Dashboard */}
+        <main className="flex-1 overflow-y-auto p-5">
+          <div className="max-w-7xl mx-auto space-y-5">
+            {/* Row 1: Timeline */}
+            <div className="grid grid-cols-1 gap-5">
+              <motion.div
+                className={`${CARD} p-5`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <p className="text-[11px] text-white/30 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Calendar size={12} className="text-violet-400/70" />
+                  {mode === "user"
+                    ? `Timeline — u/${authorQuery}`
+                    : "Narrative Velocity"}
+                </p>
+                <div className="h-[260px] w-full min-w-0">
+                  <TimelineChart
+                    data={timelineData}
+                    onDateChange={handleDateChange}
+                  />
+                </div>
+
+                {/* Dynamically Generated Summary Box */}
+                {timelineData && timelineData.length > 0 && (
+                  <div className="mt-4 p-3 bg-violet-500/5 border border-violet-500/10 rounded-lg text-white/60 text-[12px] leading-relaxed flex items-start gap-2">
+                    <MessageSquare
+                      size={14}
+                      className="text-violet-400/50 mt-0.5 shrink-0"
+                    />
+                    <p className="flex-1">
+                      <strong className="text-white/80">AI Insight: </strong>
+                      {loadingSummary ? (
+                        <span className="animate-pulse text-white/40 ml-1">
+                          Analyzing timeline events...
+                        </span>
+                      ) : (
+                        <span>{timelineSummary}</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+
+            {/* Row 2: 2 charts */}
+            <div className="grid grid-cols-2 gap-5">
+              <motion.div
+                className={`${CARD} p-5`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.1 }}
+              >
+                <p className="text-[11px] text-white/30 uppercase tracking-widest mb-4">
+                  {mode === "user"
+                    ? "Target Communities"
+                    : mode === "subreddit"
+                      ? "Top Domains"
+                      : "Community Distribution"}
+                </p>
+                <div className="h-[220px] w-full min-w-0">
+                  {mode === "subreddit" ? (
+                    <BarChart data={domains} dataKey="count" nameKey="domain" />
+                  ) : (
+                    <BarChart
+                      data={subreddits}
+                      dataKey="count"
+                      nameKey="subreddit"
+                      onBarClick={(d) => handleSubredditClick(d.subreddit)}
+                    />
+                  )}
+                </div>
+              </motion.div>
+
+              <motion.div
+                className={`${CARD} overflow-hidden`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.16 }}
+              >
+                <div className="p-5 pb-3">
+                  <p className="text-[11px] text-white/30 uppercase tracking-widest">
+                    {mode === "user" ? "Co-Active Actors" : "Top Amplifiers"}
+                  </p>
+                  {mode !== "user" && (
+                    <p className="text-[10px] text-white/20 mt-1">
+                      Click to profile →
+                    </p>
+                  )}
+                </div>
+                <div className="h-[200px] overflow-auto">
+                  <RankedTable
+                    columns={[
+                      { key: "author", label: "Actor" },
+                      { key: "count", label: "Posts" },
+                    ]}
+                    data={authors}
+                    onRowClick={(row) => handleAuthorClick(row.author)}
+                  />
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Row 3: Network Graph (Full Width) */}
+            <motion.div
+              className={`${CARD} p-5 flex flex-col`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: 0.05 }}
+            >
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <p className="text-[11px] text-white/30 uppercase tracking-widest mb-1.5">
+                    {mode === "user"
+                      ? "Community Footprint"
+                      : "Information Ecosystem"}
+                  </p>
+                  <p className="text-[10px] text-white/20">
+                    Authors · Subreddits network (Sized by Centrality)
+                  </p>
+                </div>
+                <div className="text-[10px] text-white/30 bg-white/[0.03] px-2 py-1 rounded">
+                  Interactive Map
+                </div>
+              </div>
+              <div className="w-full h-[400px] relative rounded-lg overflow-hidden bg-black/30 border border-white/[0.04]">
+                {networkData.nodes.length > 0 ? (
+                  <NetworkGraph
+                    graphData={networkData}
+                    onNodeClick={(node) => {
+                      if (node.group === 1) {
+                        handleAuthorClick(node.name);
+                      } else if (node.group === 2) {
+                        const subName = node.name.startsWith("r/")
+                          ? node.name.slice(2)
+                          : node.name;
+                        handleSubredditClick(subName);
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-[11px] text-white/15">
+                    No data
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Row 3: Cluster Embeddings (Full Width) */}
+            <motion.div
+              className={`${CARD} p-5 flex flex-col`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: 0.08 }}
+            >
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <p className="text-[11px] text-white/30 uppercase tracking-widest mb-1.5">
+                    Semantic Topic Clustering
+                  </p>
+                  <p className="text-[10px] text-white/20">
+                    3D UMAP text embeddings dynamically clustered via KMeans
+                  </p>
+                </div>
+              </div>
+              <div className="w-full h-[500px] relative rounded-lg overflow-hidden bg-black/30 border border-white/[0.04]">
+                <TopicClusters
+                  data={clusterData}
+                  nClusters={nClusters}
+                  onSliderChange={setNClusters}
+                  onNodeClick={(post) => navigate("/post", { state: { post } })}
+                />
+              </div>
+            </motion.div>
+
+            {/* Evidence */}
+            <PostList
+              title={
+                mode === "user"
+                  ? "Posts by This Actor"
+                  : mode === "subreddit"
+                    ? `Top Posts in r/${subredditQuery}`
+                    : "Evidence Layer"
+              }
+              posts={evidencePosts}
+              totalPosts={totalMatches}
+              sortBy={postSortBy}
+              onSortChange={setPostSortBy}
+              onPostClick={(post) => navigate("/post", { state: { post } })}
+              onAuthorClick={handleAuthorClick}
+              onSubredditClick={handleSubredditClick}
+              onLoadMore={handleLoadMore}
+            />
+          </div>
+        </main>
+      </div>
+
+      {/* ── RIGHT CHAT PANEL ── */}
+      <AnimatePresence>
+        {chatOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 340, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 shrink-0 border-l border-white/[0.06] bg-black/80 backdrop-blur-2xl flex flex-col overflow-hidden"
+            style={{ minWidth: 0 }}
+          >
+            <ChatPanel onClose={() => setChatOpen(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export default App;

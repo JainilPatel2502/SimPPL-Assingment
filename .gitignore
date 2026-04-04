@@ -2,7 +2,9 @@ Backend/Data/reddit_01
 Backend/Data/reddit_02
 venv/
 Trace/node_modules/
-Backend/Data/epstein_submissions_2026_01.csv
-Backend/Data/epstein_submissions_2026_02.csv
-Backend/Data/epstein_submissions_merged.csv
-Backend/Data/embeddings.pkl
+Data/epstein_submissions_2026_01.csv
+Data/epstein_submissions_2026_02.csv
+Data/epstine_submissions_merged.csv
+Data/embeddings.pkl
+
+.env
