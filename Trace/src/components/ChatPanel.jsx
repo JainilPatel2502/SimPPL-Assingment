@@ -293,10 +293,10 @@ export default function ChatPanel({ onClose }) {
           </div>
           <div>
             <p className="text-[12px] font-semibold text-white/80 leading-none">
-              Dataset AI
+              Explore with AI
             </p>
             <p className="text-[10px] text-white/25 mt-0.5">
-              Open AI · Tool Calling
+              OpenAI · Tool Calling
             </p>
           </div>
         </div>

@@ -7,3 +7,5 @@ Data/epstein_submissions_2026_02.csv
 Data/epstine_submissions_merged.csv
 Data/embeddings.pkl
 Backend/.env
+Backend/__pycache__/
+Backend/__pycache__

@@ -23,6 +23,7 @@ import {
   X,
   PanelRightOpen,
   PanelRightClose,
+  Component,
 } from "lucide-react";
 import TimelineChart from "./components/TimelineChart";
 import BarChart from "./components/BarChart";
@@ -136,7 +137,8 @@ function App() {
 
   const navigate = useNavigate();
 
-  const currentQuery = mode === "topic" ? query || null : null;
+  const currentQuery =
+    mode === "topic" || mode === "cluster" ? query || null : null;
   const currentSubreddit = mode === "subreddit" ? subredditQuery || null : null;
   const currentAuthor = mode === "user" ? authorQuery || null : null;
 
@@ -251,7 +253,7 @@ function App() {
             setLoadingSummary(false);
           });
       } else {
-        fetchSearch(
+        const evidence = await fetchSearch(
           currentQuery,
           searchMode,
           currentSubreddit,
@@ -384,7 +386,7 @@ function App() {
 
   const switchMode = (m) => {
     setMode(m);
-    if (m === "topic") setSearchInput(query || "epstein");
+    if (m === "topic" || m === "cluster") setSearchInput(query || "epstein");
     if (m === "subreddit") setSearchInput(subredditQuery || "conspiracy");
     if (m === "user") setSearchInput(authorQuery || "");
   };
@@ -399,6 +401,10 @@ function App() {
       hint: "Community deep dive",
     },
     user: { header: `u/${authorQuery || "…"}`, hint: "Actor profile" },
+    cluster: {
+      header: "Semantic Clustering",
+      hint: "3D UMAP text embeddings dynamically clustered",
+    },
   };
   const lbl = modeLabels[mode];
 
@@ -406,6 +412,7 @@ function App() {
     { key: "topic", Icon: LayoutDashboard, label: "Topic Analysis" },
     { key: "subreddit", Icon: Globe, label: "Subreddit Mode" },
     { key: "user", Icon: Users, label: "Actor Mode" },
+    { key: "cluster", Icon: Component, label: "Semantic Clusters" },
   ];
 
   return (
@@ -443,7 +450,7 @@ function App() {
         </div>
         <div className="h-px bg-white/[0.06] mx-5" />
         <nav className="flex-1 py-5 px-3 flex flex-col gap-0.5">
-          {navItems.map(({ key, Icon, label }) => (
+          {navItems.map(({ key, Icon: ItemIcon, label }) => (
             <button
               key={key}
               onClick={() => switchMode(key)}
@@ -453,7 +460,7 @@ function App() {
                   : "text-white/40 hover:text-white/70 hover:bg-white/[0.04]"
               }`}
             >
-              <Icon
+              <ItemIcon
                 size={15}
                 className={mode === key ? "text-violet-400" : "text-white/30"}
               />
@@ -574,168 +581,23 @@ function App() {
               }`}
             >
               <MessageSquare size={13} />
-              <span>Dataset AI</span>
+              <span>Explore with AI</span>
             </button>
           </div>
         </header>
 
-        {/* Dashboard */}
-        <main className="flex-1 overflow-y-auto p-5">
-          <div className="max-w-7xl mx-auto space-y-5">
-            {/* Row 1: Timeline */}
-            <div className="grid grid-cols-1 gap-5">
-              <motion.div
-                className={`${CARD} p-5`}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <p className="text-[11px] text-white/30 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Calendar size={12} className="text-violet-400/70" />
-                  {mode === "user"
-                    ? `Timeline — u/${authorQuery}`
-                    : "Narrative Velocity"}
-                </p>
-                <div className="h-[260px] w-full min-w-0">
-                  <TimelineChart
-                    data={timelineData}
-                    onDateChange={handleDateChange}
-                  />
-                </div>
-
-                {/* Dynamically Generated Summary Box */}
-                {timelineData && timelineData.length > 0 && (
-                  <div className="mt-4 p-3 bg-violet-500/5 border border-violet-500/10 rounded-lg text-white/60 text-[12px] leading-relaxed flex items-start gap-2">
-                    <MessageSquare
-                      size={14}
-                      className="text-violet-400/50 mt-0.5 shrink-0"
-                    />
-                    <p className="flex-1">
-                      <strong className="text-white/80">AI Insight: </strong>
-                      {loadingSummary ? (
-                        <span className="animate-pulse text-white/40 ml-1">
-                          Analyzing timeline events...
-                        </span>
-                      ) : (
-                        <span>{timelineSummary}</span>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </motion.div>
-            </div>
-
-            {/* Row 2: 2 charts */}
-            <div className="grid grid-cols-2 gap-5">
-              <motion.div
-                className={`${CARD} p-5`}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: 0.1 }}
-              >
-                <p className="text-[11px] text-white/30 uppercase tracking-widest mb-4">
-                  {mode === "user"
-                    ? "Target Communities"
-                    : mode === "subreddit"
-                      ? "Top Domains"
-                      : "Community Distribution"}
-                </p>
-                <div className="h-[220px] w-full min-w-0">
-                  {mode === "subreddit" ? (
-                    <BarChart data={domains} dataKey="count" nameKey="domain" />
-                  ) : (
-                    <BarChart
-                      data={subreddits}
-                      dataKey="count"
-                      nameKey="subreddit"
-                      onBarClick={(d) => handleSubredditClick(d.subreddit)}
-                    />
-                  )}
-                </div>
-              </motion.div>
-
-              <motion.div
-                className={`${CARD} overflow-hidden`}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: 0.16 }}
-              >
-                <div className="p-5 pb-3">
-                  <p className="text-[11px] text-white/30 uppercase tracking-widest">
-                    {mode === "user" ? "Co-Active Actors" : "Top Amplifiers"}
-                  </p>
-                  {mode !== "user" && (
-                    <p className="text-[10px] text-white/20 mt-1">
-                      Click to profile →
-                    </p>
-                  )}
-                </div>
-                <div className="h-[200px] overflow-auto">
-                  <RankedTable
-                    columns={[
-                      { key: "author", label: "Actor" },
-                      { key: "count", label: "Posts" },
-                    ]}
-                    data={authors}
-                    onRowClick={(row) => handleAuthorClick(row.author)}
-                  />
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Row 3: Network Graph (Full Width) */}
+        {/* Dashboard / Clusters */}
+        <main
+          className={`flex-1 overflow-y-auto ${mode === "cluster" ? "p-0" : "p-5"}`}
+        >
+          {mode === "cluster" ? (
             <motion.div
-              className={`${CARD} p-5 flex flex-col`}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: 0.05 }}
+              className="flex flex-col h-full overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.25 }}
             >
-              <div className="flex justify-between items-end mb-4">
-                <div>
-                  <p className="text-[11px] text-white/30 uppercase tracking-widest mb-1.5">
-                    {mode === "user"
-                      ? "Community Footprint"
-                      : "Information Ecosystem"}
-                  </p>
-                  <p className="text-[10px] text-white/20">
-                    Authors · Subreddits network (Sized by Centrality)
-                  </p>
-                </div>
-                <div className="text-[10px] text-white/30 bg-white/[0.03] px-2 py-1 rounded">
-                  Interactive Map
-                </div>
-              </div>
-              <div className="w-full h-[400px] relative rounded-lg overflow-hidden bg-black/30 border border-white/[0.04]">
-                {networkData.nodes.length > 0 ? (
-                  <NetworkGraph
-                    graphData={networkData}
-                    onNodeClick={(node) => {
-                      if (node.group === 1) {
-                        handleAuthorClick(node.name);
-                      } else if (node.group === 2) {
-                        const subName = node.name.startsWith("r/")
-                          ? node.name.slice(2)
-                          : node.name;
-                        handleSubredditClick(subName);
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-[11px] text-white/15">
-                    No data
-                  </div>
-                )}
-              </div>
-            </motion.div>
-
-            {/* Row 3: Cluster Embeddings (Full Width) */}
-            <motion.div
-              className={`${CARD} p-5 flex flex-col`}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: 0.08 }}
-            >
-              <div className="flex justify-between items-end mb-4">
+              <div className="p-5 flex justify-between items-end border-b border-white/[0.04] bg-white/[0.02]">
                 <div>
                   <p className="text-[11px] text-white/30 uppercase tracking-widest mb-1.5">
                     Semantic Topic Clustering
@@ -745,7 +607,7 @@ function App() {
                   </p>
                 </div>
               </div>
-              <div className="w-full h-[500px] relative rounded-lg overflow-hidden bg-black/30 border border-white/[0.04]">
+              <div className="flex-1 relative bg-black">
                 <TopicClusters
                   data={clusterData}
                   nClusters={nClusters}
@@ -754,26 +616,178 @@ function App() {
                 />
               </div>
             </motion.div>
+          ) : (
+            <div className="max-w-7xl mx-auto space-y-5">
+              {/* Row 1: Timeline */}
+              <div className="grid grid-cols-1 gap-5">
+                <motion.div
+                  className={`${CARD} p-5`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <p className="text-[11px] text-white/30 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Calendar size={12} className="text-violet-400/70" />
+                    {mode === "user"
+                      ? `Timeline — u/${authorQuery}`
+                      : "Narrative Velocity"}
+                  </p>
+                  <div className="h-[260px] w-full min-w-0">
+                    <TimelineChart
+                      data={timelineData}
+                      onDateChange={handleDateChange}
+                    />
+                  </div>
 
-            {/* Evidence */}
-            <PostList
-              title={
-                mode === "user"
-                  ? "Posts by This Actor"
-                  : mode === "subreddit"
-                    ? `Top Posts in r/${subredditQuery}`
-                    : "Evidence Layer"
-              }
-              posts={evidencePosts}
-              totalPosts={totalMatches}
-              sortBy={postSortBy}
-              onSortChange={setPostSortBy}
-              onPostClick={(post) => navigate("/post", { state: { post } })}
-              onAuthorClick={handleAuthorClick}
-              onSubredditClick={handleSubredditClick}
-              onLoadMore={handleLoadMore}
-            />
-          </div>
+                  {/* Dynamically Generated Summary Box */}
+                  {timelineData && timelineData.length > 0 && (
+                    <div className="mt-4 p-3 bg-violet-500/5 border border-violet-500/10 rounded-lg text-white/60 text-[12px] leading-relaxed flex items-start gap-2">
+                      <MessageSquare
+                        size={14}
+                        className="text-violet-400/50 mt-0.5 shrink-0"
+                      />
+                      <p className="flex-1">
+                        <strong className="text-white/80">AI Insight: </strong>
+                        {loadingSummary ? (
+                          <span className="animate-pulse text-white/40 ml-1">
+                            Analyzing timeline events...
+                          </span>
+                        ) : (
+                          <span>{timelineSummary}</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              </div>
+
+              {/* Row 2: 2 charts */}
+              <div className="grid grid-cols-2 gap-5">
+                <motion.div
+                  className={`${CARD} p-5`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: 0.1 }}
+                >
+                  <p className="text-[11px] text-white/30 uppercase tracking-widest mb-4">
+                    {mode === "user"
+                      ? "Target Communities"
+                      : mode === "subreddit"
+                        ? "Top Domains"
+                        : "Community Distribution"}
+                  </p>
+                  <div className="h-[220px] w-full min-w-0">
+                    {mode === "subreddit" ? (
+                      <BarChart
+                        data={domains}
+                        dataKey="count"
+                        nameKey="domain"
+                      />
+                    ) : (
+                      <BarChart
+                        data={subreddits}
+                        dataKey="count"
+                        nameKey="subreddit"
+                        onBarClick={(d) => handleSubredditClick(d.subreddit)}
+                      />
+                    )}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  className={`${CARD} overflow-hidden`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: 0.16 }}
+                >
+                  <div className="p-5 pb-3">
+                    <p className="text-[11px] text-white/30 uppercase tracking-widest">
+                      {mode === "user" ? "Co-Active Actors" : "Top Amplifiers"}
+                    </p>
+                    {mode !== "user" && (
+                      <p className="text-[10px] text-white/20 mt-1">
+                        Click to profile →
+                      </p>
+                    )}
+                  </div>
+                  <div className="h-[200px] overflow-auto">
+                    <RankedTable
+                      columns={[
+                        { key: "author", label: "Actor" },
+                        { key: "count", label: "Posts" },
+                      ]}
+                      data={authors}
+                      onRowClick={(row) => handleAuthorClick(row.author)}
+                    />
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Row 3: Network Graph (Full Width) */}
+              <motion.div
+                className={`${CARD} p-5 flex flex-col`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.05 }}
+              >
+                <div className="flex justify-between items-end mb-4">
+                  <div>
+                    <p className="text-[11px] text-white/30 uppercase tracking-widest mb-1.5">
+                      {mode === "user"
+                        ? "Community Footprint"
+                        : "Information Ecosystem"}
+                    </p>
+                    <p className="text-[10px] text-white/20">
+                      Authors · Subreddits network (Sized by Centrality)
+                    </p>
+                  </div>
+                  <div className="text-[10px] text-white/30 bg-white/[0.03] px-2 py-1 rounded">
+                    Interactive Map
+                  </div>
+                </div>
+                <div className="w-full h-[400px] relative rounded-lg overflow-hidden bg-black/30 border border-white/[0.04]">
+                  {networkData.nodes.length > 0 ? (
+                    <NetworkGraph
+                      graphData={networkData}
+                      onNodeClick={(node) => {
+                        if (node.group === 1) {
+                          handleAuthorClick(node.name);
+                        } else if (node.group === 2) {
+                          const subName = node.name.startsWith("r/")
+                            ? node.name.slice(2)
+                            : node.name;
+                          handleSubredditClick(subName);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-[11px] text-white/15">
+                      No data
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+
+              {/* Evidence */}
+              <PostList
+                title={
+                  mode === "user"
+                    ? "Posts by This Actor"
+                    : mode === "subreddit"
+                      ? `Top Posts in r/${subredditQuery}`
+                      : "Evidence Layer"
+                }
+                posts={evidencePosts}
+                totalPosts={totalMatches}
+                sortBy={postSortBy}
+                onSortChange={setPostSortBy}
+                onPostClick={(post) => navigate("/post", { state: { post } })}
+                onAuthorClick={handleAuthorClick}
+                onSubredditClick={handleSubredditClick}
+                onLoadMore={handleLoadMore}
+              />
+            </div>
+          )}
         </main>
       </div>
 
