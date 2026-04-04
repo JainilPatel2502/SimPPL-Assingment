@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8000/api/topic",
+  baseURL: "http://3.91.65.247:8000/api/topic",
 });
 
 // Format date to YYYY-MM-DD
@@ -168,7 +168,7 @@ export const fetchClusters = async (nClusters = 5, limit = 2000) => {
   return data;
 };
 
-const rootApi = axios.create({ baseURL: "http://localhost:8000" });
+const rootApi = axios.create({ baseURL: "http://3.91.65.247:8000" });
 
 export const sendChatMessage = async (message, history = []) => {
   const { data } = await rootApi.post("/api/chat", { message, history });
