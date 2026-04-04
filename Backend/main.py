@@ -1,14 +1,18 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 import pandas as pd
 from pydantic import BaseModel
 import numpy as np
 import os
 import traceback
+import io
+import zipfile
 import networkx as nx
 from datetime import date
 from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 import uvicorn
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
@@ -222,6 +226,33 @@ def search_posts(
         cleaned_results.append(r_clean)
         
     return {"total_matches": len(filtered_df), "results": cleaned_results}
+
+@app.get("/api/topic/projector-export")
+def export_tf_projector():
+    """
+    Exports a ZIP file containing vectors.tsv and metadata.tsv for Tensorflow Projector
+    """
+    if df is None or len(df) == 0:
+        return {"error": "Dataset not loaded"}
+    
+    working_df = df.dropna(subset=['umap_x', 'umap_y', 'umap_z']).copy()
+
+    # Create vectors.tsv
+    vectors_df = working_df[['umap_x', 'umap_y', 'umap_z']]
+    vectors_tsv = vectors_df.to_csv(sep='\t', index=False, header=False)
+    
+    # Create metadata.tsv
+    meta_df = working_df[['author', 'subreddit', 'title']]
+    metadata_tsv = meta_df.to_csv(sep='\t', index=False)
+    
+    # Pre-ZIP in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        zip_file.writestr("vectors.tsv", vectors_tsv)
+        zip_file.writestr("metadata.tsv", metadata_tsv)
+    
+    return Response(content=zip_buffer.getvalue(), media_type="application/zip", headers={'Content-Disposition': 'attachment; filename="tf_projector_data.zip"'})
+
 
 class ChatRequest(BaseModel):
     message: str
