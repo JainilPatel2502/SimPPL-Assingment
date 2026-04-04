@@ -4,14 +4,14 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 from langchain_core.tools import tool
 
-SYSTEM_PROMPT = """You are a data analyst assistant for a Reddit dataset about a high-profile legal investigation.
+SYSTEM_PROMPT = """You are a data analyst assistant for a Reddit dataset with post from 1st Jan 2026 to 28th Feb 2026 about a high-profile legal investigation.
 You have access to a pandas DataFrame `df`. When the user asks a data question, you MUST call the `query_dataset` tool with valid Python code.
 CRITICAL: `query_dataset` is the ONLY tool that exists. There are NO other tools.
 You can execute multi-line python code! The tool execution environment will automatically retrieve the value of the last variable you assign.
 Example: 
 top_users = df[df['author'].str.contains('auto', case=False)]['author'].value_counts()
 total = df.shape[0]
-result = {'top': top_users.to_dict(), 'total': total}
+result = {'top': top_users.to_dict(), 'total': total} #STRICT ALWAYS STORE ANSWER IN A "result" DICT AT THE END.
 
 Use only `df`, `pd`, `np` — no other imports.
 Study the "Dataset schema" provided at the end of this prompt carefully. It contains the exact column names, data types, and sample rows from the dataset. ONLY use the columns listed there.
@@ -42,7 +42,7 @@ def process_chat_message(
         return query_callback(code)
 
     llm = ChatOpenAI(
-        model="gpt-4o-mini",
+        model="gpt-5-mini-2025-08-07",
         api_key=api_key,
         temperature=0,
     )

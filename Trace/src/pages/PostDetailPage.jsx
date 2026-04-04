@@ -14,6 +14,8 @@ import {
   FlaskConical,
   Tag,
   Activity,
+  Target,
+  Search,
 } from "lucide-react";
 import { fetchPostAnalysis } from "../lib/api";
 
@@ -302,6 +304,16 @@ export default function PostDetailPage() {
                     title="Narrative Classification"
                     description="Classifying narrative..."
                   />
+                  <NlpPlaceholder
+                    icon={Target}
+                    title="Targeting / Name Calling"
+                    description="Detecting attacks..."
+                  />
+                  <NlpPlaceholder
+                    icon={Search}
+                    title="Doubt & Credibility"
+                    description="Analyzing skepticism..."
+                  />
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
@@ -377,7 +389,47 @@ export default function PostDetailPage() {
                     </div>
                     <div className="h-px bg-white/[0.05]" />
                     <p className="text-[13px] text-white/80 leading-relaxed">
-                      {analysisData?.narrative_classification || "Unavailable"}
+                      {analysisData?.narrative || "Unavailable"}
+                    </p>
+                  </div>
+
+                  <div className={`${CARD} p-6 flex flex-col gap-3`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-400/15 flex items-center justify-center">
+                        <Target size={15} className="text-rose-300/70" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-white/70">
+                          Targeting / Name Calling
+                        </p>
+                        <p className="text-[11px] text-white/25">
+                          Ad hominem attacks, insulting labels
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-px bg-white/[0.05]" />
+                    <p className="text-[13px] text-white/80 leading-relaxed max-h-32 overflow-y-auto">
+                      {analysisData?.name_calling || "None detected."}
+                    </p>
+                  </div>
+
+                  <div className={`${CARD} p-6 flex flex-col gap-3`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-400/15 flex items-center justify-center">
+                        <Search size={15} className="text-sky-300/70" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-white/70">
+                          Doubt & Credibility Questioning
+                        </p>
+                        <p className="text-[11px] text-white/25">
+                          Skepticism of subjects or mainstream reports
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-px bg-white/[0.05]" />
+                    <p className="text-[13px] text-white/80 leading-relaxed max-h-32 overflow-y-auto">
+                      {analysisData?.doubt_credibility || "None detected."}
                     </p>
                   </div>
                 </div>

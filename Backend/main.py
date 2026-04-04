@@ -248,6 +248,7 @@ def _filter_dataframe(
 @app.get("/api/topic/search")
 def search_topic(
     q: str = Query(None, description="Search query string"),
+    search_mode: str = Query("semantic", description="Search mode: 'keyword' or 'semantic'"),
     subreddit: str = Query(None, description="Subreddit to search in"),
     author: str = Query(None, description="Author to search for"),
     start_date: date = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -260,28 +261,35 @@ def search_topic(
     """Returns top posts matching the query with sorting and pagination."""
     
     # 1. Base Filter (Without Query string first, so we get index context)
-    filtered_df = _filter_dataframe(query=None, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date)
+    start_dt = pd.to_datetime(start_date) if start_date else None
+    end_dt = pd.to_datetime(end_date) if end_date else None
+    filtered_df = _filter_dataframe(query=None, subreddit=subreddit, author=author, start_date=start_dt, end_date=end_dt)
     
     if len(filtered_df) == 0:
         return {"total_matches": 0, "results": []}
         
-    # 2. Semantic Search execution (if valid query is provided)
+    # 2. Execute Search
     if q and q.strip() and len(q.strip()) > 1:
-        valid_indices = filtered_df.index.to_numpy()
-        # Semantic search on query, bounded by the filters we already applied map back via Index
-        semantic_results = semantic_search_impl(query=q, top_k=limit + offset, pre_filtered_indices=valid_indices)
         
-        # Override the filtered_df with the semantic payload results and set default sorting.
-        if len(semantic_results) > 0:
-            filtered_df = semantic_results
-            if sort_by == "score": # If the user hasn't explicitly clicked a table header and default state is 'score', we override the UI to use 'semantic'.
-                sort_by = "similarity"
+        if search_mode == "keyword":
+            # Pure Keyword Search
+            filtered_df = filtered_df[filtered_df['content_lower'].str.contains(q.lower(), na=False)]
+            # In keyword mode, we do NOT override sorting. It can stick to default score.
         else:
-            filtered_df = filtered_df.head(0) # Emptied out
+            # Semantic / Hybrid Search
+            valid_indices = filtered_df.index.to_numpy()
+            semantic_results = semantic_search_impl(query=q, top_k=limit + offset, pre_filtered_indices=valid_indices)
+            
+            # Override the filtered_df with the semantic payload results and set default sorting.
+            if len(semantic_results) > 0:
+                filtered_df = semantic_results
+                if sort_by == "score": # If the user hasn't explicitly clicked a table header and default state is 'score', we override the UI to use 'semantic'.
+                    sort_by = "similarity"
+            else:
+                filtered_df = filtered_df.head(0) # Emptied out
             
     elif q:
         # Edge Case handler for weird stuff (empty string, 1 character)
-        # Revert back to plain string contains matching so it doesn't crash or return completely unrelated items
         filtered_df = filtered_df[filtered_df['content_lower'].str.contains(q.lower(), na=False)]
 
     # Calculate Engagement Score if needed
@@ -666,6 +674,8 @@ class PostAnalysisResponse(BaseModel):
     sentiment: str | None = None
     entities: list[str] | None = None
     narrative: str | None = None
+    name_calling: str | None = None
+    doubt_credibility: str | None = None
     error: str | None = None
     
 @app.post("/api/post/analyze", response_model=PostAnalysisResponse)

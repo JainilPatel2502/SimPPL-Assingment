@@ -51,6 +51,22 @@ function useSessionState(key, initialValue) {
   return [value, setValue];
 }
 
+const AppCache = {
+  key: null,
+  timelineData: [],
+  subreddits: [],
+  domains: [],
+  authors: [],
+  networkData: { nodes: [], links: [] },
+  clusterData: [],
+  timelineSummary: "",
+  evidencePosts: [],
+  totalMatches: 0,
+  postOffset: 0,
+  postSortBy: "score",
+  nClusters: 5,
+};
+
 function App() {
   const [query, setQuery] = useSessionState("trace_query", "");
   const [subredditQuery, setSubredditQuery] = useSessionState("trace_sub", "");
@@ -63,22 +79,60 @@ function App() {
   const [startDate, setStartDate] = useSessionState("trace_start", null);
   const [endDate, setEndDate] = useSessionState("trace_end", null);
   const [mode, setMode] = useSessionState("trace_mode", "topic");
+  const [searchMode, setSearchMode] = useSessionState(
+    "trace_search_mode",
+    "semantic",
+  );
 
-  const [timelineData, setTimelineData] = useState([]);
-  const [subreddits, setSubreddits] = useState([]);
-  const [domains, setDomains] = useState([]);
-  const [authors, setAuthors] = useState([]);
-  const [networkData, setNetworkData] = useState({ nodes: [], links: [] });
-  const [clusterData, setClusterData] = useState([]);
-  const [timelineSummary, setTimelineSummary] = useState("");
+  // Also track these in session state so they restore instantly before computing params key
+  const [nClusters, setNClusters] = useSessionState("trace_clusters", 5);
+  const [postSortBy, setPostSortBy] = useSessionState("trace_sort", "score");
+
+  const currentParamsKey = JSON.stringify({
+    query,
+    subredditQuery,
+    searchMode,
+    authorQuery,
+    startDate,
+    endDate,
+    mode,
+    postSortBy,
+    nClusters,
+  });
+  const isRestoring =
+    AppCache.key === currentParamsKey && AppCache.key !== null;
+
+  const [timelineData, setTimelineData] = useState(
+    isRestoring ? AppCache.timelineData : [],
+  );
+  const [subreddits, setSubreddits] = useState(
+    isRestoring ? AppCache.subreddits : [],
+  );
+  const [domains, setDomains] = useState(isRestoring ? AppCache.domains : []);
+  const [authors, setAuthors] = useState(isRestoring ? AppCache.authors : []);
+  const [networkData, setNetworkData] = useState(
+    isRestoring ? AppCache.networkData : { nodes: [], links: [] },
+  );
+  const [clusterData, setClusterData] = useState(
+    isRestoring ? AppCache.clusterData : [],
+  );
+  const [timelineSummary, setTimelineSummary] = useState(
+    isRestoring ? AppCache.timelineSummary : "",
+  );
   const [loadingSummary, setLoadingSummary] = useState(false);
-  const [nClusters, setNClusters] = useState(5);
-  const [evidencePosts, setEvidencePosts] = useState([]);
-  const [totalMatches, setTotalMatches] = useState(0);
-  const [postSortBy, setPostSortBy] = useState("score");
-  const [postOffset, setPostOffset] = useState(0);
+  const [evidencePosts, setEvidencePosts] = useState(
+    isRestoring ? AppCache.evidencePosts : [],
+  );
+  const [totalMatches, setTotalMatches] = useState(
+    isRestoring ? AppCache.totalMatches : 0,
+  );
+  const [postOffset, setPostOffset] = useState(
+    isRestoring ? AppCache.postOffset : 0,
+  );
   const [loading, setLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatWidth, setChatWidth] = useSessionState("trace_chat_width", 340);
+  const [isResizingChat, setIsResizingChat] = useState(false);
 
   const navigate = useNavigate();
 
@@ -144,6 +198,7 @@ function App() {
             fetchClusters(nClusters, 2000),
             fetchSearch(
               currentQuery,
+              searchMode,
               currentSubreddit,
               currentAuthor,
               startDate,
@@ -155,13 +210,25 @@ function App() {
             ),
           ]);
         setTimelineData(timeline);
+        AppCache.timelineData = timeline;
         setSubreddits(subs);
+        AppCache.subreddits = subs;
         setDomains(doms);
+        AppCache.domains = doms;
         setAuthors(auth);
+        AppCache.authors = auth;
         setNetworkData(net);
+        AppCache.networkData = net;
         setClusterData(clusters || []);
+        AppCache.clusterData = clusters || [];
         setEvidencePosts(evidence.results);
+        AppCache.evidencePosts = evidence.results;
         setTotalMatches(evidence.total_matches);
+        AppCache.totalMatches = evidence.total_matches;
+        AppCache.postOffset = 0;
+        AppCache.nClusters = nClusters;
+        AppCache.postSortBy = postSortBy;
+        AppCache.key = currentParamsKey;
 
         // Fetch AI Summary asynchronously
         setLoadingSummary(true);
@@ -174,16 +241,19 @@ function App() {
         )
           .then((summaryRes) => {
             setTimelineSummary(summaryRes.summary);
+            AppCache.timelineSummary = summaryRes.summary;
             setLoadingSummary(false);
           })
           .catch((err) => {
             console.error("AI Summary error", err);
             setTimelineSummary("AI Summary failed to load.");
+            AppCache.timelineSummary = "AI Summary failed to load.";
             setLoadingSummary(false);
           });
       } else {
-        const evidence = await fetchSearch(
+        fetchSearch(
           currentQuery,
+          searchMode,
           currentSubreddit,
           currentAuthor,
           startDate,
@@ -193,8 +263,14 @@ function App() {
           "desc",
           postOffset,
         );
-        setEvidencePosts((prev) => [...prev, ...evidence.results]);
+        setEvidencePosts((prev) => {
+          const updated = [...prev, ...evidence.results];
+          AppCache.evidencePosts = updated;
+          return updated;
+        });
         setTotalMatches(evidence.total_matches);
+        AppCache.totalMatches = evidence.total_matches;
+        AppCache.postOffset = postOffset;
       }
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -204,12 +280,27 @@ function App() {
   };
 
   useEffect(() => {
+    const currentParamsKey = JSON.stringify({
+      query,
+      subredditQuery,
+      authorQuery,
+      searchMode,
+      startDate,
+      endDate,
+      mode,
+      postSortBy,
+      nClusters,
+    });
+    if (AppCache.key === currentParamsKey) return;
+
     setPostOffset(0);
+    AppCache.key = currentParamsKey;
     loadData(false);
   }, [
     query,
     subredditQuery,
     authorQuery,
+    searchMode,
     startDate,
     endDate,
     mode,
@@ -217,13 +308,45 @@ function App() {
     nClusters,
   ]);
   useEffect(() => {
-    if (postOffset > 0) loadData(true);
+    if (postOffset > 0 && AppCache.postOffset !== postOffset) {
+      AppCache.postOffset = postOffset;
+      loadData(true);
+    }
   }, [postOffset]);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizingChat) return;
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth > 250 && newWidth < 1200) {
+        setChatWidth(newWidth);
+      }
+    };
+    const handleMouseUp = () => {
+      setIsResizingChat(false);
+    };
+    if (isResizingChat) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    } else {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizingChat, setChatWidth]);
 
   const handleLoadMore = () => setPostOffset((prev) => prev + 10);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    AppCache.key = null; // force reload
     if (mode === "subreddit") {
       setSubredditQuery(searchInput);
       setQuery("");
@@ -369,22 +492,57 @@ function App() {
               onSubmit={handleSearch}
               className="relative flex items-center gap-2"
             >
-              <div className="relative flex-1">
-                <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-                  size={15}
-                />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search narratives, communities, or keywords…"
-                  className="bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.15] rounded-xl py-2.5 pl-10 pr-4 text-[14px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-violet-500/60 focus:bg-white/[0.06] transition-all w-[500px]"
-                />
+              <div className="relative flex-1 flex items-center gap-3">
+                <div className="relative w-[500px]">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                    size={15}
+                  />
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="Search narratives, communities, or keywords…"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.15] rounded-xl py-2.5 pl-10 pr-4 text-[14px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-violet-500/60 focus:bg-white/[0.06] transition-all"
+                  />
+                </div>
+
+                {/* Search Mode Toggle */}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] shrink-0">
+                  <span
+                    className={`text-[11px] font-medium transition-colors ${searchMode === "keyword" ? "text-violet-400" : "text-white/30"}`}
+                  >
+                    Keyword
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSearchMode((prev) =>
+                        prev === "semantic" ? "keyword" : "semantic",
+                      )
+                    }
+                    className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50"
+                    style={{
+                      backgroundColor:
+                        searchMode === "semantic"
+                          ? "rgba(139, 92, 246, 0.4)"
+                          : "rgba(255, 255, 255, 0.1)",
+                    }}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${searchMode === "semantic" ? "translate-x-4" : "translate-x-0"}`}
+                    />
+                  </button>
+                  <span
+                    className={`text-[11px] font-medium transition-colors ${searchMode === "semantic" ? "text-violet-400" : "text-white/30"}`}
+                  >
+                    Semantic
+                  </span>
+                </div>
               </div>
               <button
                 type="submit"
-                className="bg-violet-600 hover:bg-violet-500 text-white font-medium text-[13px] px-5 py-2.5 rounded-xl transition-colors border border-violet-500 hover:border-violet-400 shrink-0"
+                className="bg-violet-600 hover:bg-violet-500 text-white font-medium text-[13px] px-5 py-2.5 rounded-xl transition-colors border border-violet-500 hover:border-violet-400 shrink-0 ml-2"
               >
                 Search
               </button>
@@ -624,12 +782,22 @@ function App() {
         {chatOpen && (
           <motion.div
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 340, opacity: 1 }}
+            animate={{ width: chatWidth, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            transition={
+              isResizingChat
+                ? { duration: 0 }
+                : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+            }
             className="relative z-10 shrink-0 border-l border-white/[0.06] bg-black/80 backdrop-blur-2xl flex flex-col overflow-hidden"
             style={{ minWidth: 0 }}
           >
+            <div
+              className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-50 transition-colors ${
+                isResizingChat ? "bg-violet-500/80" : "hover:bg-violet-500/50"
+              }`}
+              onMouseDown={() => setIsResizingChat(true)}
+            />
             <ChatPanel onClose={() => setChatOpen(false)} />
           </motion.div>
         )}

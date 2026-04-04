@@ -12,6 +12,7 @@ const formatDate = (date) => {
 
 export const fetchSearch = async (
   query = "",
+  searchMode = "semantic",
   subreddit = null,
   author = null,
   startDate = null,
@@ -24,6 +25,7 @@ export const fetchSearch = async (
   const { data } = await api.get("/search", {
     params: {
       q: query,
+      search_mode: searchMode,
       subreddit,
       author,
       start_date: formatDate(startDate),
