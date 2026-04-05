@@ -5,7 +5,7 @@ _A submission for the SimPPL Research Engineering Intern Assignment_
 **Quick Links:**
 
 - **Live Dashboard:** [http://simppl-frontend.s3-website-us-east-1.amazonaws.com/](http://simppl-frontend.s3-website-us-east-1.amazonaws.com/)
-- **Video Walkthrough:** [Insert YouTube/Drive Link Here]
+- **Video Walkthrough:** [YouTube](https://youtu.be/SP9SP2ljA0k?si=KE_33UK8Pv8g2Qz7)
 - **AI Prompts Log:** [See `jainil-prompts.md`](./jainil-prompts.md)
 
 ---
