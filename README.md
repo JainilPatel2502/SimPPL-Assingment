@@ -35,7 +35,7 @@ This project serves as a case study on the release of the **"Epstein Files"**, a
 ---
 
 ## Screenshots
-## 📸 Screenshots
+## Screenshots
 
 ### 🔹 Interactive Timeline & Trend Analysis
 ![Interactive Timeline](https://github.com/user-attachments/assets/35e640b1-79ad-4744-8726-d640b108417c)
@@ -97,7 +97,7 @@ _*Disclaimer: I **DO NOT** declare or claim that any specific user is a bot. Rat
 
 ---
 
-## 🗺️ System Workflow
+## System Workflow
 
 ```mermaid
 flowchart TD
@@ -155,20 +155,28 @@ flowchart TD
 ## 🧠 ML / AI Components
 
 As required, here are the algorithmic and architectural details of the ML features implemented:
+### 1. Generative AI & Tool-Calling Agents
 
-### 1. Embeddings & Semantic Search
+* **Models:** `gpt-4o-mini`, `gpt-5-mini-2025-08-07`
+* **Usage:**
+
+  * **gpt-4o-mini** → GenAI summaries & bulk NLP (cheap + fast)
+  * **gpt-5-mini** → AI chatbot, reasoning & tool-calling *(smart + still budget-friendly 😉)*
+* **Stack:** `langchain-openai` for orchestration
+
+### 2. Embeddings & Semantic Search
 
 - **Model/Algorithm:** `all-MiniLM-L6-v2` (SentenceTransformers) / OpenAI `text-embedding-3-small` (dependant on pipeline config).
 - **Key Parameters:** 384 embedding dimensions, Cosine Similarity distance metric.
 - **Library/API:** `sentence-transformers`, `scikit-learn` for nearest neighbors, `FAISS` for vector indexing.
 
-### 2. Topic Clustering
+### 3. Topic Clustering
 
 - **Model/Algorithm:** KMeans Clustering + UMAP for dimensionality reduction.
-- **Key Parameters:** `n_clusters` (Tunable in UI via slider, default 10), UMAP `n_components=2` or `3` for visualization.
+- **Key Parameters:** `n_clusters` (Tunable in UI via slider, default 10), UMAP `n_components=3` for visualization.
 - **Library/API:** `scikit-learn` (KMeans), `umap-learn`, visualized via **Datamapplot** / **Plotly**.
 
-### 3. Network / Centrality Analysis
+### 4. Network / Centrality Analysis
 
 - **Model/Algorithm:** PageRank and Louvain Community Detection.
 - **Key Parameters:** Damping factor `d=0.85` (PageRank), resolution=1.0 (Louvain).
@@ -176,7 +184,7 @@ As required, here are the algorithmic and architectural details of the ML featur
 
 ---
 
-## 🕵️ Semantic Search Examples
+## Semantic Search Examples
 
 Here are three examples of the semantic search successfully retrieving results with zero/minimal keyword overlap:
 
