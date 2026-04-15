@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://3.91.65.247:8000/api/topic",
+  baseURL: "http://localhost:8000/api/topic",
 });
 
 // Format date to YYYY-MM-DD
@@ -41,6 +41,7 @@ export const fetchSearch = async (
 
 export const fetchTimeline = async (
   query = "",
+  searchMode = "semantic",
   subreddit = null,
   author = null,
   startDate = null,
@@ -49,6 +50,7 @@ export const fetchTimeline = async (
   const { data } = await api.get("/timeline", {
     params: {
       q: query,
+      search_mode: searchMode,
       subreddit,
       author,
       start_date: formatDate(startDate),
@@ -60,6 +62,7 @@ export const fetchTimeline = async (
 
 export const fetchTimelineSummary = async (
   query = "",
+  searchMode = "semantic",
   subreddit = null,
   author = null,
   startDate = null,
@@ -68,6 +71,7 @@ export const fetchTimelineSummary = async (
   const { data } = await api.get("/timeline/summary", {
     params: {
       q: query,
+      search_mode: searchMode,
       subreddit,
       author,
       start_date: formatDate(startDate),
@@ -79,6 +83,7 @@ export const fetchTimelineSummary = async (
 
 export const fetchSubreddits = async (
   query = "",
+  searchMode = "semantic",
   subreddit = null,
   author = null,
   startDate = null,
@@ -88,6 +93,7 @@ export const fetchSubreddits = async (
   const { data } = await api.get("/subreddits", {
     params: {
       q: query,
+      search_mode: searchMode,
       subreddit,
       author,
       start_date: formatDate(startDate),
@@ -100,6 +106,7 @@ export const fetchSubreddits = async (
 
 export const fetchDomains = async (
   query = "",
+  searchMode = "semantic",
   subreddit = null,
   author = null,
   startDate = null,
@@ -109,6 +116,7 @@ export const fetchDomains = async (
   const { data } = await api.get("/domains", {
     params: {
       q: query,
+      search_mode: searchMode,
       subreddit,
       author,
       start_date: formatDate(startDate),
@@ -121,6 +129,7 @@ export const fetchDomains = async (
 
 export const fetchAuthors = async (
   query = "",
+  searchMode = "semantic",
   subreddit = null,
   author = null,
   startDate = null,
@@ -130,6 +139,7 @@ export const fetchAuthors = async (
   const { data } = await api.get("/authors", {
     params: {
       q: query,
+      search_mode: searchMode,
       subreddit,
       author,
       start_date: formatDate(startDate),
@@ -142,6 +152,7 @@ export const fetchAuthors = async (
 
 export const fetchNetwork = async (
   query = "",
+  searchMode = "semantic",
   subreddit = null,
   author = null,
   startDate = null,
@@ -151,6 +162,7 @@ export const fetchNetwork = async (
   const { data } = await api.get("/network", {
     params: {
       q: query,
+      search_mode: searchMode,
       subreddit,
       author,
       start_date: formatDate(startDate),
@@ -168,7 +180,7 @@ export const fetchClusters = async (nClusters = 5, limit = 2000) => {
   return data;
 };
 
-const rootApi = axios.create({ baseURL: "http://3.91.65.247:8000" });
+const rootApi = axios.create({ baseURL: "http://localhost:8000" });
 
 export const sendChatMessage = async (message, history = []) => {
   const { data } = await rootApi.post("/api/chat", { message, history });

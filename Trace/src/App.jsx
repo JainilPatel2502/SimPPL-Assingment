@@ -160,6 +160,7 @@ function App() {
           await Promise.all([
             fetchTimeline(
               currentQuery,
+              searchMode,
               currentSubreddit,
               currentAuthor,
               startDate,
@@ -167,6 +168,7 @@ function App() {
             ),
             fetchSubreddits(
               currentQuery,
+              searchMode,
               currentSubreddit,
               currentAuthor,
               startDate,
@@ -175,6 +177,7 @@ function App() {
             ),
             fetchDomains(
               currentQuery,
+              searchMode,
               currentSubreddit,
               currentAuthor,
               startDate,
@@ -183,6 +186,7 @@ function App() {
             ),
             fetchAuthors(
               currentQuery,
+              searchMode,
               currentSubreddit,
               currentAuthor,
               startDate,
@@ -191,6 +195,7 @@ function App() {
             ),
             fetchNetwork(
               currentQuery,
+              searchMode,
               currentSubreddit,
               currentAuthor,
               startDate,
@@ -236,6 +241,7 @@ function App() {
         setLoadingSummary(true);
         fetchTimelineSummary(
           currentQuery,
+          searchMode,
           currentSubreddit,
           currentAuthor,
           startDate,

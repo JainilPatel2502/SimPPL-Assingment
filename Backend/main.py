@@ -220,7 +220,8 @@ def _filter_dataframe(
     subreddit: str | None = None,
     author: str | None = None,
     start_date: date | None = None,
-    end_date: date | None = None
+    end_date: date | None = None,
+    search_mode: str = "semantic"
 ) -> pd.DataFrame:
     """Helper method to filter the dataframe based on query parameters."""
     if df is None:
@@ -228,20 +229,29 @@ def _filter_dataframe(
         
     filtered_df = df.copy()
     
-    if query:
-        filtered_df = filtered_df[filtered_df['content_lower'].str.contains(query.lower(), na=False)]
-    
-    if subreddit:
-        filtered_df = filtered_df[filtered_df['subreddit'].str.lower() == subreddit.lower()]
-        
-    if author:
-        filtered_df = filtered_df[filtered_df['author'].str.lower() == author.lower()]
-        
+    # Apply date filters first
     if start_date and 'date' in filtered_df.columns:
         filtered_df = filtered_df[filtered_df['date'] >= start_date]
         
     if end_date and 'date' in filtered_df.columns:
         filtered_df = filtered_df[filtered_df['date'] <= end_date]
+        
+    # Apply auth/sub filters
+    if subreddit:
+        filtered_df = filtered_df[filtered_df['subreddit'].str.lower() == subreddit.lower()]
+        
+    if author:
+        filtered_df = filtered_df[filtered_df['author'].str.lower() == author.lower()]
+    
+    # Apply query filter last (using semantic if specified)
+    if query and query.strip() and len(query.strip()) > 1:
+        if search_mode == "semantic":
+            valid_indices = filtered_df.index.to_numpy()
+            filtered_df = semantic_search_impl(query=query, top_k=1000, pre_filtered_indices=valid_indices)
+        else:
+            filtered_df = filtered_df[filtered_df['content_lower'].str.contains(query.lower(), na=False)]
+    elif query:
+        filtered_df = filtered_df[filtered_df['content_lower'].str.contains(query.lower(), na=False)]
         
     return filtered_df
 
@@ -263,7 +273,7 @@ def search_topic(
     # 1. Base Filter (Without Query string first, so we get index context)
     start_dt = pd.to_datetime(start_date) if start_date else None
     end_dt = pd.to_datetime(end_date) if end_date else None
-    filtered_df = _filter_dataframe(query=None, subreddit=subreddit, author=author, start_date=start_dt, end_date=end_dt)
+    filtered_df = _filter_dataframe(query=None, subreddit=subreddit, author=author, start_date=start_dt, end_date=end_dt, search_mode="keyword")
     
     if len(filtered_df) == 0:
         return {"total_matches": 0, "results": []}
@@ -317,13 +327,14 @@ def search_topic(
 @app.get("/api/topic/timeline")
 def get_timeline(
     q: str = Query(None, description="Search query string"),
+    search_mode: str = Query("semantic", description="Search mode: 'keyword' or 'semantic'"),
     subreddit: str = Query(None, description="Subreddit to search in"),
     author: str = Query(None, description="Author to search for"),
     start_date: date = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: date = Query(None, description="End date (YYYY-MM-DD)")
 ):
     """Returns the time series of posts per day."""
-    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date)
+    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date, search_mode=search_mode)
     
     if 'date' not in filtered_df.columns or len(filtered_df) == 0:
         return []
@@ -344,6 +355,7 @@ def get_timeline(
 @app.get("/api/topic/timeline/summary")
 def get_timeline_summary(
     q: str = Query(None, description="Search query string"),
+    search_mode: str = Query("semantic", description="Search mode: 'keyword' or 'semantic'"),
     subreddit: str = Query(None, description="Subreddit to search in"),
     author: str = Query(None, description="Author to search for"),
     start_date: date = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -351,7 +363,7 @@ def get_timeline_summary(
 ):
     """Returns AI-generated narrative summary of the timeline."""
     # Build timeline directly using get_timeline
-    timeline_results = get_timeline(q, subreddit, author, start_date, end_date)
+    timeline_results = get_timeline(q, search_mode, subreddit, author, start_date, end_date)
     
     if not timeline_results or len(timeline_results) == 0:
         return {"summary": "No data available to summarize."}
@@ -364,6 +376,7 @@ def get_timeline_summary(
 @app.get("/api/topic/subreddits")
 def get_subreddits(
     q: str = Query(None, description="Search query string"),
+    search_mode: str = Query("semantic", description="Search mode: 'keyword' or 'semantic'"),
     subreddit: str = Query(None, description="Subreddit to search in"),
     author: str = Query(None, description="Author to search for"),
     start_date: date = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -371,7 +384,7 @@ def get_subreddits(
     limit: int = Query(20, description="Number of top subreddits to return")
 ):
     """Returns the top subreddits discussing the topic."""
-    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date)
+    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date, search_mode=search_mode)
     
     if 'subreddit' not in filtered_df.columns or len(filtered_df) == 0:
         return []
@@ -386,6 +399,7 @@ def get_subreddits(
 @app.get("/api/topic/domains")
 def get_domains(
     q: str = Query(None, description="Search query string"),
+    search_mode: str = Query("semantic", description="Search mode: 'keyword' or 'semantic'"),
     subreddit: str = Query(None, description="Subreddit to search in"),
     author: str = Query(None, description="Author to search for"),
     start_date: date = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -393,7 +407,7 @@ def get_domains(
     limit: int = Query(20, description="Number of top domains to return")
 ):
     """Returns the top domains shared in the topic."""
-    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date)
+    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date, search_mode=search_mode)
     
     if 'domain' not in filtered_df.columns or len(filtered_df) == 0:
         return []
@@ -415,6 +429,7 @@ def get_domains(
 @app.get("/api/topic/authors")
 def get_authors(
     q: str = Query(None, description="Search query string"),
+    search_mode: str = Query("semantic", description="Search mode: 'keyword' or 'semantic'"),
     subreddit: str = Query(None, description="Subreddit to search in"),
     author: str = Query(None, description="Author to search for"),
     start_date: date = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -425,7 +440,7 @@ def get_authors(
     
     if author:
         # Instead of just returning the user, find Co-Active Actors.
-        base_df = _filter_dataframe(query=q, subreddit=subreddit, author=None, start_date=start_date, end_date=end_date)
+        base_df = _filter_dataframe(query=q, subreddit=subreddit, author=None, start_date=start_date, end_date=end_date, search_mode=search_mode)
         if 'author' not in base_df.columns or len(base_df) == 0:
             return []
             
@@ -459,7 +474,7 @@ def get_authors(
         author_df = co_actors_df
     else:
         # Normal behavior for top authors overall
-        filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date)
+        filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date, search_mode=search_mode)
         if 'author' not in filtered_df.columns or len(filtered_df) == 0:
             return []
         
@@ -476,6 +491,7 @@ def get_authors(
 @app.get("/api/topic/network")
 def get_network(
     q: str = Query(None, description="Search query string"),
+    search_mode: str = Query("semantic", description="Search mode: 'keyword' or 'semantic'"),
     subreddit: str = Query(None, description="Subreddit to search in"),
     author: str = Query(None, description="Author to search for"),
     start_date: date = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -486,7 +502,7 @@ def get_network(
     Returns a network graph representing Author -> Subreddit connections.
     Format is suitable for react-force-graph: { "nodes": [], "links": [] }
     """
-    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date)
+    filtered_df = _filter_dataframe(query=q, subreddit=subreddit, author=author, start_date=start_date, end_date=end_date, search_mode=search_mode)
     
     required_cols = ['author', 'subreddit']
     if not all(col in filtered_df.columns for col in required_cols) or len(filtered_df) == 0:
