@@ -4,7 +4,6 @@ _A submission for the SimPPL Research Engineering Intern Assignment_
 
 **Quick Links:**
 
-- **Live Dashboard:** [http://simppl-frontend.s3-website-us-east-1.amazonaws.com/](http://simppl-frontend.s3-website-us-east-1.amazonaws.com/)
 - **Video Walkthrough:** [YouTube](https://youtu.be/SP9SP2ljA0k?si=KE_33UK8Pv8g2Qz7)
 - **AI Prompts Log:** [See `jainil-prompts.md`](./jainil-prompts.md)
 
@@ -34,7 +33,6 @@ This project serves as a case study on the release of the **"Epstein Files"**, a
 
 ---
 
-## Screenshots
 ## Screenshots
 
 ### 🔹 Interactive Timeline & Trend Analysis
@@ -206,13 +204,6 @@ Here are three examples of the semantic search successfully retrieving results w
 - **Result Returned:** "Epstein File is now a distraction: Anyone find the timing for the file release odd? For the past months this administration was doing everything to distract us..."
 - **Why it worked:** The query’s focus on "conspiracy theories" and "timing" mapped perfectly to a user questioning the "odd timing" of the release as a deliberate political distraction.
 
----
-
-## ☁️ AWS Deployment Architecture
-
-- **Frontend:** `Amazon S3 Static Website Hosting`, globally accessible.
-- **Backend:** Hosted on a powerful **AWS EC2 `m7i-flex.large`** instance to provide the necessary expanded RAM required for fast, in-memory Pandas dataframe processing.
-- **Secrets Management:** The OpenAI API keys utilized by the system are securely managed in production using the **AWS Systems Manager (SSM) Parameter Store**, integrated with **KMS Encryption**.
 
 ---
 
